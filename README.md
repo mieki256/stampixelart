@@ -94,14 +94,14 @@ Pillow-3.4.2-cp27-cp27m-win32.whl を入手後、以下を実行。
      pip install Pillow-3.4.2-cp27-cp27m-win32.whl
 
 
-Licence
+License
 -------
 
-CC0 / Public Domain.
+stampixelart.py and *.py and image files : CC0 / Public Domain.
 
-pyファイルと添付画像ファイルは CC0 / Public Domain ってことでよろしくです。
-
-(PySideのバイナリはライセンスが LGPL なので、もし、このファイルをexeファイル等に変換して配布する際には、このあたり変わってくるのかもしれないけど現状そのへんよく分かってないです。)
+Python : PSFL  
+PySide : LGPL 2.1  
+Pillow : PIL Software License
 
 
 Author
