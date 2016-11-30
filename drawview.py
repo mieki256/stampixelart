@@ -1,6 +1,6 @@
 #!python
 # -*- mode: python; Encoding: utf-8; coding: utf-8 -*-
-# Last updated: <2016/11/29 05:25:22 +0900>
+# Last updated: <2016/12/01 04:52:20 +0900>
 # pylint: disable=C0103,W0401,W0602,W0603,W0613,W0614,E1101
 u"""キャンバス関係クラス群."""
 
@@ -16,13 +16,12 @@ from brushimage import *        # NOQA
 from imageqtpoor import ImageQtPoor
 
 
-UNDO_MAX = 30
-PADDING = 40
-
-
 class DrawScene(QGraphicsScene):
 
     u"""描画ウインドウ用Scene."""
+
+    UNDO_MAX = 30
+    PADDING = 40
 
     BR_PREVIEW = 0
     BR_DRAW = 1
@@ -34,6 +33,9 @@ class DrawScene(QGraphicsScene):
         u"""初期化."""
         super(DrawScene, self).__init__(*argv, **keywords)
 
+        self.grid_size = QSize(8, 8)
+        self.grid_opacity = 0.25
+        self.grid_color = QColor(255, 0, 0, 255)
         self.undo_buf = []
 
         # チェック柄用ブラシを生成
@@ -42,26 +44,41 @@ class DrawScene(QGraphicsScene):
         # ブラシを描き込むための、中身が空のQPixmapを用意
         w, h = DrawScene.DEF_CANVAS_SIZE
         self.canvas_pixmap = QPixmap(w, h)
-        self.canvas_pixmap.fill(QColor(0, 0, 0, 0))
+        self.canvas_pixmap.fill(Qt.transparent)
 
         bg = QPixmap(w, h)
-        bg.fill(QColor(0, 0, 0, 0))
+        bg.fill(Qt.transparent)
+
+        grid = QPixmap(w, h)
+        grid.fill(Qt.transparent)
 
         # Scene に Item を追加
+        # 背景のチェック柄
         self.chkbrd_item = QGraphicsPixmapItem(bg)
         self.addItem(self.chkbrd_item)
-        self.chkbrd_item.setOffset(PADDING, PADDING)
+        self.chkbrd_item.setOffset(DrawScene.PADDING, DrawScene.PADDING)
 
+        # キャンバス
         self.canvas_item = QGraphicsPixmapItem(self.canvas_pixmap)
         self.addItem(self.canvas_item)
-        self.canvas_item.setOffset(PADDING, PADDING)
+        self.canvas_item.setOffset(DrawScene.PADDING, DrawScene.PADDING)
 
+        # ブラシ
         self.brush_pixmap = QPixmap(32, 32)
         self.brush_pixmap.fill(QColor(0, 0, 0, 0))
         self.brush_item = QGraphicsPixmapItem(self.brush_pixmap)
         self.addItem(self.brush_item)
 
+        # グリッド
+        self.grid_pixmap = QPixmap(w, h)
+        self.grid_pixmap.fill(Qt.transparent)
+        self.grid_item = QGraphicsPixmapItem(self.grid_pixmap)
+        self.addItem(self.grid_item)
+        self.grid_item.setOffset(DrawScene.PADDING, DrawScene.PADDING)
+        self.grid_item.setVisible(False)
+
         self.set_chkbrd_bg()
+        self.set_grid(self.grid_size, self.grid_opacity, self.grid_color)
 
     def get_canvas_size(self):
         u"""現在のキャンバスサイズをタプルで返す."""
@@ -85,7 +102,7 @@ class DrawScene(QGraphicsScene):
         w, h = self.get_canvas_size()
         self.set_chkbrd_bg()
         self.canvas_item.setPixmap(self.canvas_pixmap)
-        self.canvas_item.setOffset(PADDING, PADDING)
+        self.canvas_item.setOffset(DrawScene.PADDING, DrawScene.PADDING)
         self.update()
 
     def set_chkbrd_bg(self):
@@ -112,6 +129,73 @@ class DrawScene(QGraphicsScene):
         qp.end()
         del qp
         return bg
+
+    def set_grid(self, size, grid_opacity, col=Qt.red):
+        u"""グリッド表示レイヤーを指定された升目で作成."""
+        self.grid_opacity = grid_opacity
+        gw, gh = size.width(), size.height()
+
+        # 升目1つ分を作成
+        bpm = self.get_grid_pm_b(gw, gh, col)
+        brush = QBrush(bpm)
+
+        # 作った升目でキャンバスサイズのQPixmapを矩形塗り潰し
+        w, h = self.get_canvas_size()
+        pm = QPixmap(w, h)
+        pm.fill(Qt.transparent)
+        qp = QPainter()
+        qp.begin(pm)
+        qp.fillRect(0, 0, w, h, brush)
+        qp.end()
+        del qp
+        del brush
+        del bpm
+        self.grid_pixmap = pm
+        self.grid_item.setPixmap(self.grid_pixmap)
+
+        if self.grid_item.isVisible():
+            self.grid_item.setOpacity(self.grid_opacity)
+
+    def get_grid_pm_a(self, gw, gh, col):
+        u"""グリッドの升目一つ分を作成して返す."""
+        pen = QPen(col, 1, Qt.SolidLine)
+        bpm = QPixmap(gw, gh)
+        bpm.fill(Qt.transparent)
+        qp = QPainter()
+        qp.begin(bpm)
+        qp.setPen(pen)
+        qp.drawPoint(0, 0)
+        qp.drawPoint(1, 0)
+        qp.drawPoint(2, 0)
+        qp.drawPoint(0, 1)
+        qp.drawPoint(0, 2)
+        qp.drawPoint(gw - 1, gw - 1)
+        qp.drawPoint(gw - 2, gw - 1)
+        qp.drawPoint(gw - 3, gw - 1)
+        qp.drawPoint(gw - 1, gw - 2)
+        qp.drawPoint(gw - 1, gw - 3)
+        qp.end()
+        del qp
+        del pen
+        return bpm
+
+    def get_grid_pm_b(self, gw, gh, col):
+        u"""グリッドの升目一つ分を作成して返す."""
+        r, g, b, a = col.red(), col.green(), col.blue(), col.alpha()
+        col2 = QColor(r / 2, g / 2, b / 2, a)
+        bpm = QPixmap(gw * 2, gh * 2)
+        bpm.fill(Qt.transparent)
+        qp = QPainter()
+        qp.begin(bpm)
+        qp.setPen(QPen(col, 1, Qt.SolidLine))
+        qp.drawRect(0, 0, gw - 1, gh - 1)
+        qp.drawRect(gw, gh, gw - 1, gh - 1)
+        qp.setPen(QPen(col2, 1, Qt.SolidLine))
+        qp.drawRect(gw, 0, gw - 1, gh - 1)
+        qp.drawRect(0, gh, gw - 1, gh - 1)
+        qp.end()
+        del qp
+        return bpm
 
     def set_new_brush_image(self):
         u"""ブラシ画像を設定."""
@@ -212,7 +296,7 @@ class DrawScene(QGraphicsScene):
 
     def save_undo(self):
         u"""キャンバスをUndoバッファに記憶."""
-        if len(self.undo_buf) > UNDO_MAX:
+        if len(self.undo_buf) > DrawScene.UNDO_MAX:
             del(self.undo_buf[0])
         self.undo_buf.append(self.canvas_pixmap.copy())
 
@@ -229,6 +313,15 @@ class DrawScene(QGraphicsScene):
     def get_brush_image(self):
         u"""現在のブラシ画像を返す."""
         return self.parent().get_brush_image()
+
+    def show_grid(self, grid_opacity):
+        u"""グリッドを表示. grid_opacityは0.0(透明)-1.0(不透明)の値を取る."""
+        self.grid_item.setVisible(True)
+        self.grid_item.setOpacity(grid_opacity)
+
+    def hide_grid(self):
+        u"""グリッドを非表示."""
+        self.grid_item.setVisible(False)
 
 
 class DrawAreaView(QGraphicsView):
@@ -288,8 +381,8 @@ class DrawAreaView(QGraphicsView):
         w, h = self.get_canvas_size()
 
         # キャンバスサイズに余白をつける
-        w += PADDING * 2
-        h += PADDING * 2
+        w += DrawScene.PADDING * 2
+        h += DrawScene.PADDING * 2
 
         # Sceneの矩形を更新。自動でスクロールバーの長さも変わってくれる
         self.scene().setSceneRect(QRectF(0, 0, w, h))
@@ -493,3 +586,15 @@ class DrawAreaView(QGraphicsView):
     def get_brush_image(self):
         u"""現在のブラシ画像を返す."""
         return self.parent().get_brush_image()
+
+    def show_grid(self, grid_opacity=0.25):
+        u"""グリッドを表示."""
+        self.scene().show_grid(grid_opacity)
+
+    def hide_grid(self):
+        u"""グリッドを非表示."""
+        self.scene().hide_grid()
+
+    def set_grid(self, size, grid_opacity, col=Qt.red):
+        u"""グリッドの升目サイズを設定."""
+        self.scene().set_grid(size, grid_opacity, col)

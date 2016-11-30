@@ -1,6 +1,6 @@
 #!python
 # -*- mode: python; Encoding: utf-8; coding: utf-8 -*-
-# Last updated: <2016/11/29 05:26:24 +0900>
+# Last updated: <2016/12/01 05:30:19 +0900>
 # pylint: disable=C0103,W0401,W0602,W0603,W0613,W0614,E1101
 
 u"""
@@ -39,8 +39,10 @@ from colorselect import ColorSelectSliders
 from brushselect import BrushSelectArea
 from palettepreview import PaletteSelect
 from drawview import DrawAreaView
+from canvassizedialog import CanvasSizeDialog
+from gridsizedialog import GridSizeDialog
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 __author__ = "mieki256"
 __license__ = "CC0 / Public Domain"
 APPLI_NAME = "Stampixelart"
@@ -333,59 +335,6 @@ class BrushSelectDockWidget(QWidget):
         return self.brush_image
 
 
-class CanvasSizeInputDialog(QDialog):
-
-    u"""キャンバスサイズ入力ダイアログ."""
-
-    DEF_W = 256
-    DEF_H = 256
-
-    def __init__(self, *argv, **keywords):
-        """init."""
-        super(CanvasSizeInputDialog, self).__init__(*argv, **keywords)
-        self.setWindowTitle("Input new canvas size")
-
-        # スピンボックスを用意
-        self.input_w = QSpinBox(self)
-        self.input_h = QSpinBox(self)
-        self.input_w.setRange(1, 8192)  # 値の範囲
-        self.input_h.setRange(1, 8192)
-        self.input_w.setFixedWidth(80)  # 表示する横幅を指定
-        self.input_h.setFixedWidth(80)
-        self.input_w.setValue(CanvasSizeInputDialog.DEF_W)  # 初期値を設定
-        self.input_h.setValue(CanvasSizeInputDialog.DEF_H)
-
-        # ダイアログのOK/キャンセルボタンを用意
-        btns = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-            Qt.Horizontal, self)
-        btns.accepted.connect(self.accept)
-        btns.rejected.connect(self.reject)
-
-        # 各ウィジェットをレイアウト
-        gl = QGridLayout()
-        gl.addWidget(QLabel("Input new canvas size", self), 0, 0, 1, 4)
-        gl.addWidget(self.input_w, 1, 0)
-        gl.addWidget(QLabel("x", self), 1, 1)
-        gl.addWidget(self.input_h, 1, 2)
-        gl.addWidget(btns, 2, 3)
-        self.setLayout(gl)
-
-    def canvas_size(self):
-        u"""キャンバスサイズを取得。(w, h)で返す."""
-        w = int(self.input_w.value())
-        h = int(self.input_h.value())
-        return (w, h)
-
-    @staticmethod
-    def get_canvas_size(parent=None):
-        u"""ダイアログを開いてキャンバスサイズとOKキャンセルを返す."""
-        dialog = CanvasSizeInputDialog(parent)
-        result = dialog.exec_()  # ダイアログを開く
-        w, h = dialog.canvas_size()  # キャンバスサイズを取得
-        return (w, h, result == QDialog.Accepted)
-
-
 class MyMainWindow(QMainWindow):
 
     u"""メインウインドウ."""
@@ -394,11 +343,17 @@ class MyMainWindow(QMainWindow):
         u"""初期化."""
         super(MyMainWindow, self).__init__(parent)
         self.setWindowTitle("%s %s" % (APPLI_NAME, __version__))
+        self.setWindowIcon(QIcon("./res/stampixelart.ico"))
+
         self.cur_dir = QDesktopServices.storageLocation(
             QDesktopServices.DesktopLocation)
         self.cur_filepath = ""
         self.cur_filename = ""
         self.tools_kind = 'pen'
+
+        self.grid_size = QSize(8, 8)
+        self.grid_opacity = 0.25
+        self.grid_col = QColor(255, 0, 0, 255)
 
         self.init_action()
         self.init_menubar()
@@ -469,6 +424,18 @@ class MyMainWindow(QMainWindow):
                                    shortcut="Ctrl+0",
                                    triggered=self.zoom_fit)
 
+        self.gridshow_act = QAction(QIcon("./res/show-grid.svg"),
+                                    "Show &Grid", self,
+                                    checkable=True,
+                                    shortcut="Ctrl+G",
+                                    triggered=self.show_grid)
+
+        self.gridcfg_act = QAction(QIcon("./res/configure-grid.svg"),
+                                   "Grid &Setting", self,
+                                   shortcut=QKeySequence(
+                                       Qt.CTRL + Qt.SHIFT + Qt.Key_G),
+                                   triggered=self.setting_grid)
+
         self.pen_act = QAction(QIcon("./res/draw-freehand.svg"),
                                "Pen", self,
                                checkable=True,
@@ -521,6 +488,9 @@ class MyMainWindow(QMainWindow):
         self.view_menu.addAction(self.zoomout_act)
         self.view_menu.addAction(self.zoomact_act)
         self.view_menu.addAction(self.zoomfit_act)
+        self.view_menu.addSeparator()
+        self.view_menu.addAction(self.gridshow_act)
+        self.view_menu.addAction(self.gridcfg_act)
 
         self.tools_menu = QMenu("&Tools", self)
         self.tools_menu.addAction(self.pen_act)
@@ -563,6 +533,9 @@ class MyMainWindow(QMainWindow):
         self.view_tb.addAction(self.zoomin_act)
         self.view_tb.addAction(self.zoomact_act)
         self.view_tb.addAction(self.zoomfit_act)
+        self.view_menu.addSeparator()
+        self.view_tb.addAction(self.gridshow_act)
+        self.view_tb.addAction(self.gridcfg_act)
 
         # size = QSize(32, 32)
         # self.file_tb.setIconSize(size)
@@ -658,11 +631,37 @@ class MyMainWindow(QMainWindow):
         self.gview.clear_canvas()
         self.set_status("Cleared Canvas.")
 
+    def show_grid(self):
+        u"""グリッドの表示切替."""
+        if self.gridshow_act.isChecked():
+            self.set_status("Show Grid.")
+            self.gview.show_grid(self.grid_opacity)
+        else:
+            self.set_status("Hide Grid.")
+            self.gview.hide_grid()
+
+    def setting_grid(self):
+        u"""グリッド設定ダイアログを表示."""
+        w, h = self.grid_size.width(), self.grid_size.height()
+        a = self.grid_opacity
+        col = self.grid_col
+        dlg = GridSizeDialog(parent=self, w=w, h=h, a=a, col=col)
+        result = dlg.exec_()
+        if result:
+            w, h, a, col = dlg.get_data()
+            self.grid_size = QSize(w, h)
+            self.grid_opacity = a
+            self.grid_col = col
+            self.gview.set_grid(self.grid_size, a, col)
+            self.set_status("Grid Setting. %d x %d" % (w, h))
+            del dlg
+
     def make_new_canvas(self):
         u"""キャンバス新規作成ダイアログを表示."""
-        w, h, result = CanvasSizeInputDialog.get_canvas_size(self)
+        w, h, result = CanvasSizeDialog.get_canvas_size(self)
         if result:
             self.gview.make_new_canvas(w, h)
+            self.gview.set_grid(8, 8, col=Qt.red)
             self.cur_filepath = ""
             self.set_status("Maked New Canvas.")
             self.set_title()

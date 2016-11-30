@@ -9,7 +9,12 @@ if sys.platform == "win32":
     import py2exe
     from distutils.core import setup
 
-    IMAGELIB_DIR = r"D:\Python\Python27\Lib\site-packages\PySide\plugins\imageformats"
+    # IMAGELIB_DIR = r"D:\Python\Python27\Lib\site-packages\PySide\plugins\imageformats"
+
+    IMAGELIB_DIR = os.path.join(os.path.dirname(sys.executable),
+                                'Lib', 'site-packages', 'PySide',
+                                'plugins', 'imageformats')
+
     imgfiles = [os.path.join(IMAGELIB_DIR, i) for i in [
         "qgif4.dll",
         "qgifd4.dll",
@@ -40,7 +45,10 @@ if sys.platform == "win32":
         options={"py2exe": py2exe_options},
         # console = [
         windows=[
-            {"script": "stampixelart.py"}
+            {
+                "script": "stampixelart.py",
+                "icon_resources": [(1, "./res/stampixelart.ico")]
+            }
         ],
         zipfile="lib/libs.zip"
     )

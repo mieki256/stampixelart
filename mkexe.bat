@@ -12,6 +12,8 @@ goto END
 
 :FOUND_DIST
 echo Found %TGT_DIR% folder.
+echo Start copying the resource image files.
+
 @echo on
 copy README.md %TGT_DIR%
 xcopy brushes dist\brushes\
@@ -19,8 +21,9 @@ xcopy palettes dist\palettes\
 xcopy res dist\res\
 xcopy screenshot dist\screenshot\
 @echo off
+
 @echo.
 @echo success.
-@echo use dist\ and dist\*.exe
-:END
+@echo Please use dist\ and dist\*.exe
 
+:END
