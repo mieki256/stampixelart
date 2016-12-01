@@ -1,6 +1,6 @@
 #!python
 # -*- mode: python; Encoding: utf-8; coding: utf-8 -*-
-# Last updated: <2016/11/29 03:42:45 +0900>
+# Last updated: <2016/12/01 08:53:08 +0900>
 # pylint: disable=C0103,W0401,W0602,W0603,W0613,W0614,E1101
 u"""ブラシ画像を管理するクラス群."""
 
@@ -53,7 +53,7 @@ class BrushImages(object):
 
     def get_image_names(self):
         u"""画像名一覧をリストで返す."""
-        return self.images.keys()
+        return sorted(self.images.keys())
 
     def get_image(self, name):
         u"""ブラシ全体画像の PIL Image を返す."""
